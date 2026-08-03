@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+  <title>Sevens &middot; The Mabel Report</title>
+  <meta name="description" content="The parlour game of Sevens, for two players on two telephones.">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Sevens">
+  <meta name="theme-color" content="#FFFFFF">
+
+  <meta property="og:title" content="Sevens &middot; The Mabel Report">
+  <meta property="og:description" content="The parlour game of Sevens, for two players on two telephones.">
+  <meta property="og:url" content="https://themabelreport.com/sevens/">
+  <meta property="og:type" content="website">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23F5F1E8'/%3E%3Ctext x='32' y='47' font-size='44' text-anchor='middle' fill='%233D342D' font-family='Georgia,serif'%3E7%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- ===================== LOBBY ===================== -->
+<section class="screen is-active" id="screen-lobby">
+  <div class="sheet">
+    <header class="masthead">
+      <div class="masthead-label">The Parlour</div>
+      <h1 class="masthead-title">Sevens</h1>
+      <div class="masthead-rule">For Two Players</div>
+    </header>
+
+    <p class="lede-text">A hand of Fan&nbsp;Tan, laid out between two telephones. No accounts, no fuss.</p>
+
+    <label class="field">
+      <span class="field-label">Your Name</span>
+      <input type="text" id="name-input" maxlength="14" autocomplete="given-name"
+             autocapitalize="words" spellcheck="false" placeholder="Josh">
+    </label>
+
+    <button class="btn btn-primary" id="btn-host">Deal a New Game</button>
+
+    <div class="divider"><span>or join hers</span></div>
+
+    <div class="join-row">
+      <input type="text" id="code-input" maxlength="4" inputmode="latin" autocapitalize="characters"
+             autocomplete="off" spellcheck="false" placeholder="CODE" class="code-input">
+      <button class="btn" id="btn-join">Join</button>
+    </div>
+
+    <p class="notice" id="lobby-notice"></p>
+
+    <button class="linkish" id="btn-rules-lobby">The Rules of Play</button>
+
+    <footer class="colophon-foot">
+      <a href="/">&larr; The Mabel Report</a>
+    </footer>
+  </div>
+</section>
+
+<!-- ===================== WAITING ===================== -->
+<section class="screen" id="screen-wait">
+  <div class="sheet">
+    <header class="masthead compact">
+      <div class="masthead-label">Table Reserved</div>
+      <h1 class="masthead-title small">Sevens</h1>
+    </header>
+
+    <p class="wait-lead">Send her this code, or the link below.</p>
+
+    <div class="code-display" id="code-display">····</div>
+
+    <button class="btn btn-primary" id="btn-share">Send the Invitation</button>
+    <button class="btn" id="btn-copy">Copy Link</button>
+
+    <p class="notice" id="wait-notice">Waiting for the second player…</p>
+
+    <button class="linkish" id="btn-cancel">Never mind</button>
+  </div>
+</section>
+
+<!-- ===================== GAME ===================== -->
+<section class="screen screen-game" id="screen-game">
+
+  <div class="game-top">
+    <div class="opp">
+      <span class="opp-name" id="opp-name">Opponent</span>
+      <span class="opp-count" id="opp-count">26</span>
+      <span class="opp-unit">cards</span>
+    </div>
+    <div class="tally" id="tally">0 &ndash; 0</div>
+  </div>
+
+  <div class="status-bar" id="status-bar">Dealing…</div>
+
+  <div class="table-area" id="table-area"><!-- suit strips injected here --></div>
+
+  <div class="hand-area">
+    <div class="hand-label">
+      <span id="hand-label-text">Your Hand</span>
+      <button class="linkish tiny" id="btn-rules-game">Rules</button>
+    </div>
+    <div class="hand" id="hand"><!-- cards injected here --></div>
+  </div>
+
+  <!-- end-of-hand overlay -->
+  <div class="overlay" id="overlay">
+    <div class="overlay-card">
+      <div class="overlay-kicker" id="overlay-kicker">Final Edition</div>
+      <div class="overlay-head" id="overlay-head">You Win</div>
+      <div class="overlay-sub" id="overlay-sub"></div>
+      <button class="btn btn-primary" id="btn-rematch">Deal Again</button>
+      <button class="linkish" id="btn-quit">Leave the Table</button>
+    </div>
+  </div>
+
+  <!-- connection trouble -->
+  <div class="overlay" id="net-overlay">
+    <div class="overlay-card">
+      <div class="overlay-kicker">Stop Press</div>
+      <div class="overlay-head small" id="net-head">Disconnected</div>
+      <div class="overlay-sub" id="net-sub">Trying to reach the other telephone…</div>
+      <button class="linkish" id="btn-net-quit">Leave the Table</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== RULES ===================== -->
+<section class="screen" id="screen-rules">
+  <div class="sheet">
+    <header class="masthead compact">
+      <div class="masthead-label">Appendix</div>
+      <h1 class="masthead-title small">The Rules</h1>
+    </header>
+
+    <ol class="rules">
+      <li>The deck is split evenly — twenty-six cards apiece.</li>
+      <li>Whoever holds the <b>seven of diamonds</b> opens with it.</li>
+      <li>Thereafter you may play a <b>seven</b> of any suit not yet begun, or a card that
+          extends a suit already on the table by one rank, up or down.</li>
+      <li>Each suit fans out from its seven — down toward the ace on one side, up toward
+          the king on the other.</li>
+      <li><b>You must play if you can.</b> Passing is not a choice; when you have no legal
+          card the table passes you automatically and your opponent goes again.</li>
+      <li>First to shed every card wins. The cards left in the other hand are the margin.</li>
+    </ol>
+
+    <p class="rules-note">The whole art of it is which end you feed. Sit on a seven and
+      you lock a suit — but you lock your own cards behind it too.</p>
+
+    <button class="btn" id="btn-rules-back">Back</button>
+  </div>
+</section>
+
+<!-- PeerJS 1.5.4, served from here rather than a CDN so the table never depends
+     on someone else's uptime. https://github.com/peers/peerjs -->
+<script src="peerjs.min.js"></script>
+<script src="game.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
