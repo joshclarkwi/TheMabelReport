@@ -1,14 +1,18 @@
 /*
- * Sevens (Fan Tan) — pure rules engine. No DOM, no network.
+ * Sevens — pure rules engine. No DOM, no network.
  *
  * House rules in force:
  *   - Two to eight players. The deck is dealt out as evenly as it goes, so with
- *     an awkward number some hands carry one extra card.
+ *     an awkward number some hands carry one extra card. The deal rotates.
  *   - Whoever holds the 7 of spades opens with it.
- *   - Thereafter a card is legal if it is a seven of an unstarted suit, or if it
- *     extends an existing suit run by one rank in either direction.
- *   - Strict passing: you must play whenever you legally can, so a pass is never
- *     a choice. The engine passes for you automatically.
+ *   - Spades set the pace. A spade extends the spade run by one rank in either
+ *     direction, as in ordinary Fan Tan. A card of any OTHER suit is only
+ *     playable once the spade of the same rank is already on the table — and it
+ *     must still extend its own suit's run.
+ *   - You must play if you legally can.
+ *   - If you cannot, you ask the player who last laid a card for one. They
+ *     choose which card to hand over. You take it into your hand and forfeit
+ *     your turn; you play again when your turn next comes round.
  *   - The first player to empty their hand wins the deal.
  */
 (function (global) {
@@ -20,6 +24,7 @@
   var RANK_LABELS = [null, 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   var SUIT_ORDER = { s: 0, h: 1, d: 2, c: 3 };
 
+  var LEAD_SUIT = 's';
   var OPENING_CARD = 's7';
   var MIN_PLAYERS = 2;
   var MAX_PLAYERS = 8;
@@ -74,9 +79,9 @@
 
   /*
    * dealOffset names the seat the deal starts on. Fifty-two cards rarely split
-   * evenly, and the short hands win markedly more often, so whoever deals first
-   * matters. Rotating the offset each hand passes that edge around the table
-   * instead of parking it on the same seats all evening.
+   * evenly, and the short hands win markedly more often, so rotating the offset
+   * each hand passes that edge around the table instead of parking it on the
+   * same seats all evening.
    */
   function newGame(playerCount, dealOffset) {
     var n = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, playerCount | 0));
@@ -98,6 +103,7 @@
       turn: opener,
       opener: opener,
       dealOffset: off,
+      pending: null,        // {requester, giver} while a card is owed
       winner: null,
       stuck: false,
       log: [],
@@ -105,17 +111,28 @@
     };
   }
 
+  // Has the spade of this rank been laid? Everything outside spades waits on it.
+  function leadReady(state, rank) {
+    var run = state.table[LEAD_SUIT];
+    return !!run && rank >= run.low && rank <= run.high;
+  }
+
   function isLegal(state, card) {
-    // The deal opens with the seven of spades and nothing else.
-    if (state.played === 0) return card === OPENING_CARD;
-    var run = state.table[suitOf(card)];
-    var r = rankOf(card);
+    if (state.played === 0) return card === OPENING_CARD;   // the deal opens on s7
+
+    var s = suitOf(card), r = rankOf(card);
+
+    // Spades set the pace; every other suit follows a rank only once the
+    // matching spade is down.
+    if (s !== LEAD_SUIT && !leadReady(state, r)) return false;
+
+    var run = state.table[s];
     if (!run) return r === 7;
     return r === run.low - 1 || r === run.high + 1;
   }
 
   function legalMoves(state, seat) {
-    if (state.winner !== null || state.stuck) return [];
+    if (state.winner !== null || state.stuck || state.pending) return [];
     var hand = state.hands[seat] || [];
     var out = [];
     for (var i = 0; i < hand.length; i++) {
@@ -124,15 +141,24 @@
     return out;
   }
 
-  // Hand the turn on, passing anyone with nothing legal. A full circuit of
-  // passes cannot happen while cards remain, but the loop is bounded anyway.
-  function advance(state) {
-    for (var steps = 0; steps < state.n; steps++) {
-      state.turn = (state.turn + 1) % state.n;
-      if (legalMoves(state, state.turn).length > 0) return;
-      state.log.push({ type: 'pass', seat: state.turn });
+  // Who a stuck player must ask: the last person to put a card down. If that is
+  // somehow themselves — everyone since their own last play has been asking
+  // too — they turn to the player immediately before them.
+  function giverFor(state, seat) {
+    for (var i = state.log.length - 1; i >= 0; i--) {
+      var e = state.log[i];
+      if (e.type === 'play' && e.seat !== seat) return e.seat;
     }
-    state.stuck = true;
+    return (seat - 1 + state.n) % state.n;
+  }
+
+  // Hand the turn on. Whoever receives it either has a play or must ask for a
+  // card — there is no silent pass.
+  function advance(state) {
+    state.turn = (state.turn + 1) % state.n;
+    if (legalMoves(state, state.turn).length === 0) {
+      state.pending = { requester: state.turn, giver: giverFor(state, state.turn) };
+    }
   }
 
   /*
@@ -144,6 +170,7 @@
   function play(state, seat, card) {
     if (state.winner !== null) return 'The deal is already over.';
     if (state.stuck) return 'The deal is stuck.';
+    if (state.pending) return 'A card has been asked for first.';
     if (!(seat >= 0 && seat < state.n)) return 'Unknown player.';
     if (state.turn !== seat) return 'Not your turn.';
 
@@ -170,12 +197,43 @@
     return null;
   }
 
+  /*
+   * Hand a card to the player who asked for it. The asker forfeits their turn:
+   * they take the card and play carries on to the next seat.
+   *
+   * A giver down to their last card empties their hand by giving it away, which
+   * wins them the deal — the hand is empty however it emptied.
+   */
+  function giveCard(state, giver, card) {
+    if (state.winner !== null) return 'The deal is already over.';
+    if (!state.pending) return 'Nobody has asked for a card.';
+    if (state.pending.giver !== giver) return 'You were not the one asked.';
+
+    var idx = state.hands[giver].indexOf(card);
+    if (idx === -1) return 'That card is not in your hand.';
+
+    var asker = state.pending.requester;
+    state.hands[giver].splice(idx, 1);
+    state.hands[asker].push(card);
+    state.log.push({ type: 'give', seat: giver, to: asker, card: card });
+    state.pending = null;
+
+    if (state.hands[giver].length === 0) {
+      state.winner = giver;
+      state.log.push({ type: 'win', seat: giver });
+      return null;
+    }
+
+    state.turn = asker;      // they forfeit it immediately
+    advance(state);
+    return null;
+  }
+
   /* ---- the computer players -------------------------------------------
    *
-   * Strict passing means the only decision is which of the legal cards to let
-   * go, so the whole game is in that choice. Two things drive it: keep feeding
-   * suits you can follow yourself, and shed the cards that are only playable in
-   * a narrow window before that window closes.
+   * The only decision when playing is which legal card to let go, so that is
+   * where the whole game sits: keep feeding suits you can follow yourself, and
+   * shed the cards that are only playable in a narrow window before it closes.
    */
 
   function runLength(have, suit, from, dir) {
@@ -202,6 +260,11 @@
       // take the chance to be rid of them while it exists.
       score += Math.abs(r - 7) * 0.8;
     }
+
+    // Spades unlock every other suit, so a spade is worth rather more than the
+    // same card elsewhere: it is the only way anybody's hand keeps moving.
+    if (s === LEAD_SUIT) score += 2;
+
     return score;
   }
 
@@ -219,11 +282,52 @@
     return best;
   }
 
+  // How far a card is from ever being playable — counting the spade that gates
+  // it as well as its own suit. Higher means more stranded.
+  function giftCost(state, card) {
+    var s = suitOf(card), r = rankOf(card);
+
+    var run = state.table[s];
+    var d;
+    if (!run) d = Math.abs(r - 7) + 1;
+    else if (r < run.low) d = run.low - r;
+    else if (r > run.high) d = r - run.high;
+    else d = 0;
+
+    if (s !== LEAD_SUIT) {
+      var lead = state.table[LEAD_SUIT];
+      var ld;
+      if (!lead) ld = Math.abs(r - 7) + 1;
+      else if (r < lead.low) ld = lead.low - r;
+      else if (r > lead.high) ld = r - lead.high;
+      else ld = 0;
+      d = Math.max(d, ld);
+    }
+    return d;
+  }
+
+  // Give away the card you are least likely ever to play. It is the cheapest
+  // for you to lose and, being the furthest from legal, the least use to them.
+  function chooseGift(state, giver) {
+    var hand = state.hands[giver] || [];
+    if (!hand.length) return null;
+
+    var best = hand[0], bestCost = -Infinity;
+    for (var i = 0; i < hand.length; i++) {
+      var cost = giftCost(state, hand[i]) + Math.random() * 0.4;
+      if (cost > bestCost) { bestCost = cost; best = hand[i]; }
+    }
+    return best;
+  }
+
   /* ---- per-seat view --------------------------------------------------- */
 
   // Everything one player may see and nothing more: their own hand in full,
-  // everyone else's as a count. Names are the caller's business.
+  // everyone else's as a count. A gifted card is shown only to the two people
+  // involved, exactly as passing a card across a table would be.
   function viewFor(state, seat) {
+    var pending = state.pending;
+
     return {
       n: state.n,
       you: seat,
@@ -237,10 +341,21 @@
       legal: legalMoves(state, seat),
       counts: state.hands.map(function (h) { return h.length; }),
       turn: state.turn,
-      yourTurn: state.turn === seat && state.winner === null && !state.stuck,
+      yourTurn: state.turn === seat && state.winner === null && !state.stuck && !pending,
+      pending: pending ? { requester: pending.requester, giver: pending.giver } : null,
+      youGive: !!pending && pending.giver === seat,
+      youAsk: !!pending && pending.requester === seat,
       winner: state.winner,
       stuck: state.stuck,
-      log: state.log.slice(-10)
+      log: state.log.slice(-10).map(function (e) {
+        var out = { type: e.type, seat: e.seat };
+        if (e.to != null) out.to = e.to;
+        if (e.card) {
+          // a gift is private to giver and receiver
+          if (e.type !== 'give' || e.seat === seat || e.to === seat) out.card = e.card;
+        }
+        return out;
+      })
     };
   }
 
@@ -249,6 +364,7 @@
     SUIT_NAMES: SUIT_NAMES,
     SUIT_GLYPHS: SUIT_GLYPHS,
     RANK_LABELS: RANK_LABELS,
+    LEAD_SUIT: LEAD_SUIT,
     OPENING_CARD: OPENING_CARD,
     MIN_PLAYERS: MIN_PLAYERS,
     MAX_PLAYERS: MAX_PLAYERS,
@@ -258,10 +374,13 @@
     isRed: isRed,
     sortHand: sortHand,
     newGame: newGame,
+    leadReady: leadReady,
     isLegal: isLegal,
     legalMoves: legalMoves,
     play: play,
+    giveCard: giveCard,
     chooseCard: chooseCard,
+    chooseGift: chooseGift,
     viewFor: viewFor
   };
 })(typeof window !== 'undefined' ? window : this);

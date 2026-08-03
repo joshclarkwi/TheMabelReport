@@ -113,7 +113,7 @@
 
   <div class="table-area" id="table-area"><!-- suit strips injected here --></div>
 
-  <div class="hand-area">
+  <div class="hand-area" id="hand-area">
     <div class="hand-label">
       <span id="hand-label-text">Your Hand</span>
       <button class="linkish tiny" id="btn-rules-game">Rules</button>
@@ -157,18 +157,27 @@
           an awkward number some hands carry one extra card. The deal rotates, so
           that falls on somebody new each time.</li>
       <li>Whoever holds the <b>seven of spades</b> opens with it.</li>
-      <li>Thereafter you may play a <b>seven</b> of any suit not yet begun, or a card that
-          extends a suit already on the table by one rank, up or down.</li>
-      <li>Each suit fans out from its seven — down toward the ace on one side, up toward
-          the king on the other.</li>
-      <li><b>You must play if you can.</b> Passing is not a choice; when you have no legal
-          card the table passes you automatically and play carries on round.</li>
-      <li>First to shed every card wins the deal.</li>
+      <li><b>Spades set the pace.</b> A spade extends the spade row by one rank either
+          way — down toward the ace, up toward the king.</li>
+      <li>A card of <b>any other suit</b> may only be laid once <b>the spade of the same
+          rank is already down</b>. The eight of hearts waits on the eight of spades;
+          the four of clubs waits on the four of spades. It must still follow its own
+          row, one rank at a time from its seven.</li>
+      <li><b>You must play if you can.</b></li>
+      <li>If you have <b>no legal card</b>, you must ask the player who last laid a card
+          for one. They choose which card to hand over, and it is seen only by the two
+          of you. You take it into your hand and <b>forfeit your turn</b>, playing again
+          when your turn next comes round.</li>
+      <li>First to empty their hand wins the deal.</li>
     </ol>
 
-    <p class="rules-note">The whole art of it is which end you feed. Advance a suit you
-      can follow yourself and you keep your options; advance one you have nothing left in
-      and you have simply helped everybody else.</p>
+    <p class="rules-note">Spades are the engine of the whole game — nothing else moves
+      until they do. Hold one back and you throttle the entire table, your own hand
+      along with it.</p>
+
+    <p class="rules-note">Choosing what to give is its own small cruelty. Hand over the
+      card you are least likely to be rid of and you are usually handing them the same
+      problem.</p>
 
     <p class="rules-note">Computer players are marked <b>◇</b>. The host may seat up to
       seven of them, and may start the game whenever they please without waiting for a
