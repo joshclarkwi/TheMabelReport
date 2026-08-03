@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
   <title>Sevens &middot; The Mabel Report</title>
-  <meta name="description" content="The parlour game of Sevens, for two players on two telephones.">
+  <meta name="description" content="The parlour game of Sevens, for two to eight players.">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#FFFFFF">
 
   <meta property="og:title" content="Sevens &middot; The Mabel Report">
-  <meta property="og:description" content="The parlour game of Sevens, for two players on two telephones.">
+  <meta property="og:description" content="The parlour game of Sevens, for two to eight players.">
   <meta property="og:url" content="https://themabelreport.com/sevens/">
   <meta property="og:type" content="website">
 
@@ -32,10 +32,10 @@
     <header class="masthead">
       <div class="masthead-label">The Parlour</div>
       <h1 class="masthead-title">Sevens</h1>
-      <div class="masthead-rule">For Two Players</div>
+      <div class="masthead-rule">Two to Eight Players</div>
     </header>
 
-    <p class="lede-text">A hand of Fan&nbsp;Tan, laid out between two telephones. No accounts, no fuss.</p>
+    <p class="lede-text">A hand of Fan&nbsp;Tan, laid out between telephones. Bring friends, or play the house.</p>
 
     <label class="field">
       <span class="field-label">Your Name</span>
@@ -43,9 +43,9 @@
              autocapitalize="words" spellcheck="false" placeholder="Josh">
     </label>
 
-    <button class="btn btn-primary" id="btn-host">Deal a New Game</button>
+    <button class="btn btn-primary" id="btn-host">Open a Table</button>
 
-    <div class="divider"><span>or join hers</span></div>
+    <div class="divider"><span>or join one</span></div>
 
     <div class="join-row">
       <input type="text" id="code-input" maxlength="4" inputmode="latin" autocapitalize="characters"
@@ -63,7 +63,7 @@
   </div>
 </section>
 
-<!-- ===================== WAITING ===================== -->
+<!-- ===================== WAITING ROOM ===================== -->
 <section class="screen" id="screen-wait">
   <div class="sheet">
     <header class="masthead compact">
@@ -71,14 +71,32 @@
       <h1 class="masthead-title small">Sevens</h1>
     </header>
 
-    <p class="wait-lead">Send her this code, or the link below.</p>
+    <div class="host-only">
+      <p class="wait-lead">Send this code, or the link below.</p>
+      <div class="code-display" id="code-display">····</div>
+      <button class="btn btn-primary" id="btn-share">Send the Invitation</button>
+      <button class="btn" id="btn-copy">Copy Link</button>
+    </div>
 
-    <div class="code-display" id="code-display">····</div>
+    <div class="seat-block">
+      <div class="field-label" id="seat-heading">At the table</div>
+      <ul class="seat-list" id="seat-list"></ul>
+    </div>
 
-    <button class="btn btn-primary" id="btn-share">Send the Invitation</button>
-    <button class="btn" id="btn-copy">Copy Link</button>
+    <div class="host-only">
+      <div class="stepper">
+        <span class="stepper-label">Computer players</span>
+        <div class="stepper-controls">
+          <button class="step-btn" id="bot-minus" aria-label="One fewer computer player">&minus;</button>
+          <span class="step-value" id="bot-count">0</span>
+          <button class="step-btn" id="bot-plus" aria-label="One more computer player">+</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-start">Start the Game</button>
+    </div>
 
-    <p class="notice" id="wait-notice">Waiting for the second player…</p>
+    <p class="wait-hint" id="wait-hint"></p>
+    <p class="notice" id="wait-notice"></p>
 
     <button class="linkish" id="btn-cancel">Never mind</button>
   </div>
@@ -88,12 +106,7 @@
 <section class="screen screen-game" id="screen-game">
 
   <div class="game-top">
-    <div class="opp">
-      <span class="opp-name" id="opp-name">Opponent</span>
-      <span class="opp-count" id="opp-count">26</span>
-      <span class="opp-unit">cards</span>
-    </div>
-    <div class="tally" id="tally">0 &ndash; 0</div>
+    <div class="players" id="players"><!-- player chips injected here --></div>
   </div>
 
   <div class="status-bar" id="status-bar">Dealing…</div>
@@ -108,12 +121,13 @@
     <div class="hand" id="hand"><!-- cards injected here --></div>
   </div>
 
-  <!-- end-of-hand overlay -->
+  <!-- end-of-deal overlay -->
   <div class="overlay" id="overlay">
     <div class="overlay-card">
       <div class="overlay-kicker" id="overlay-kicker">Final Edition</div>
       <div class="overlay-head" id="overlay-head">You Win</div>
       <div class="overlay-sub" id="overlay-sub"></div>
+      <ul class="standings" id="standings"></ul>
       <button class="btn btn-primary" id="btn-rematch">Deal Again</button>
       <button class="linkish" id="btn-quit">Leave the Table</button>
     </div>
@@ -123,8 +137,8 @@
   <div class="overlay" id="net-overlay">
     <div class="overlay-card">
       <div class="overlay-kicker">Stop Press</div>
-      <div class="overlay-head small" id="net-head">Disconnected</div>
-      <div class="overlay-sub" id="net-sub">Trying to reach the other telephone…</div>
+      <div class="overlay-head small">Disconnected</div>
+      <div class="overlay-sub" id="net-sub">Trying to reach the table…</div>
       <button class="linkish" id="btn-net-quit">Leave the Table</button>
     </div>
   </div>
@@ -139,19 +153,27 @@
     </header>
 
     <ol class="rules">
-      <li>The deck is split evenly — twenty-six cards apiece.</li>
-      <li>Whoever holds the <b>seven of diamonds</b> opens with it.</li>
+      <li>Two to eight players. The deck is dealt out as evenly as it goes, so with
+          an awkward number some hands carry one extra card. The deal rotates, so
+          that falls on somebody new each time.</li>
+      <li>Whoever holds the <b>seven of spades</b> opens with it.</li>
       <li>Thereafter you may play a <b>seven</b> of any suit not yet begun, or a card that
           extends a suit already on the table by one rank, up or down.</li>
       <li>Each suit fans out from its seven — down toward the ace on one side, up toward
           the king on the other.</li>
       <li><b>You must play if you can.</b> Passing is not a choice; when you have no legal
-          card the table passes you automatically and your opponent goes again.</li>
-      <li>First to shed every card wins. The cards left in the other hand are the margin.</li>
+          card the table passes you automatically and play carries on round.</li>
+      <li>First to shed every card wins the deal.</li>
     </ol>
 
-    <p class="rules-note">The whole art of it is which end you feed. Sit on a seven and
-      you lock a suit — but you lock your own cards behind it too.</p>
+    <p class="rules-note">The whole art of it is which end you feed. Advance a suit you
+      can follow yourself and you keep your options; advance one you have nothing left in
+      and you have simply helped everybody else.</p>
+
+    <p class="rules-note">Computer players are marked <b>◇</b>. The host may seat up to
+      seven of them, and may start the game whenever they please without waiting for a
+      full table. Should a player's telephone go quiet mid-game, the house plays their
+      hand until they return.</p>
 
     <button class="btn" id="btn-rules-back">Back</button>
   </div>
