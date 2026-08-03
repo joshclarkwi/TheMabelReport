@@ -645,9 +645,18 @@
     var list = el('seat-list');
     list.innerHTML = '';
 
+    // Anyone who was not on the list last time gets a moment of gold, so a
+    // player arriving while you are looking elsewhere is not silent.
+    var keys = players.map(function (p) { return p.kind + '|' + p.name; });
+    var known = App.seatKeys || [];
+    App.seatKeys = keys;
+
+    el('wait-kicker').textContent = isHost ? 'Your Table Code' : 'Waiting Room';
+
     players.forEach(function (p, i) {
       var li = document.createElement('li');
       li.className = 'seat' + (p.kind === 'bot' ? ' is-bot' : '') + (i === youIdx ? ' is-you' : '');
+      if (known.length && known.indexOf(keys[i]) === -1) li.className += ' just-joined';
 
       var nm = document.createElement('span');
       nm.className = 'seat-name';
@@ -666,13 +675,16 @@
     el('seat-heading').textContent = 'At the table · ' + total + ' of ' + G.MAX_PLAYERS;
 
     if (isHost) {
+      var humans = roster().length;
       el('bot-count').textContent = App.tbl.botCount;
       el('bot-minus').disabled = App.tbl.botCount <= 0;
-      el('bot-plus').disabled = roster().length + App.tbl.botCount >= G.MAX_PLAYERS;
+      el('bot-plus').disabled = humans + App.tbl.botCount >= G.MAX_PLAYERS;
       el('btn-start').disabled = total < G.MIN_PLAYERS;
       el('wait-hint').textContent = total < G.MIN_PLAYERS
-        ? 'Add a computer player, or wait for somebody to join.'
-        : 'Start whenever you like — you do not have to wait for a full table.';
+        ? 'Send the invitation and their name will appear here — or add a computer player and start on your own.'
+        : (humans > 1
+            ? 'Everybody you want? Start whenever you like.'
+            : 'Start whenever you like — you need not wait for a full table.');
     } else {
       el('wait-hint').textContent = 'Waiting for ' + hostName + ' to start the game…';
     }

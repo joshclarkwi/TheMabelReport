@@ -234,24 +234,70 @@ input::placeholder { color: #BDB3A5; }
 .code-display {
   font-family: 'Fraunces', serif;
   font-variation-settings: "SOFT" 20, "opsz" 144;
-  font-size: clamp(52px, 17vw, 80px);
+  font-size: clamp(38px, 13vw, 56px);
   font-weight: 400;
+  line-height: 1.05;
   letter-spacing: 0.14em;
   text-align: center;
   color: var(--accent);
-  padding: 16px 0 22px;
-  margin-bottom: 26px;
-  border-top: 1px solid var(--rule);
-  border-bottom: 3px double var(--ink);
+  padding: 2px 0 12px;
   text-indent: 0.14em;
 }
 
 /* ===== WAITING ROOM ===== */
 #screen-wait:not(.is-host) .host-only { display: none; }
 
-.seat-block { margin: 24px 0 22px; }
+.screen-wait.is-active {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 520px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.wait-head {
+  flex: 0 0 auto;
+  text-align: center;
+  padding: calc(16px + var(--safe-top)) 22px 12px;
+  border-bottom: 3px double var(--ink);
+}
+
+.wait-head .masthead-label { margin-bottom: 8px; }
+
+.share-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.share-row .btn { margin-bottom: 0; font-size: 15px; padding: 12px 8px; }
+
+/* The list is the part that grows, so it is the part that scrolls. */
+.wait-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 22px 8px;
+}
+
+.wait-foot {
+  flex: 0 0 auto;
+  padding: 12px 22px calc(10px + var(--safe-bottom));
+  border-top: 1px solid var(--ink);
+  background: var(--bg);
+}
+.wait-foot .btn { margin-bottom: 0; }
+.wait-foot .linkish { margin-top: 12px; }
 
 .seat-list { list-style: none; border-top: 1px solid var(--ink); }
+
+/* a new arrival should catch the eye */
+.seat.just-joined { animation: arrive 1.1s ease-out; }
+@keyframes arrive {
+  0%   { background: rgba(212,160,74,0.35); transform: translateX(-6px); }
+  100% { background: transparent; transform: translateX(0); }
+}
 
 .seat {
   display: flex;
@@ -288,9 +334,8 @@ input::placeholder { color: #BDB3A5; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 0;
-  margin-bottom: 18px;
-  border-top: 1px solid var(--rule);
+  padding: 0 0 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--rule);
 }
 
