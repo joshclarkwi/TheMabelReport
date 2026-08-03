@@ -63,41 +63,41 @@
   </div>
 </section>
 
-<!-- ===================== WAITING ROOM ===================== -->
-<section class="screen" id="screen-wait">
-  <div class="sheet">
-    <header class="masthead compact">
-      <div class="masthead-label">Table Reserved</div>
-      <h1 class="masthead-title small">Sevens</h1>
-    </header>
+<!-- ===================== WAITING ROOM =====================
+     Three bands in a full-height column: an invitation header, a scrolling
+     list of who has sat down, and a footer pinned to the bottom. The footer
+     matters — "Start the Game" must never drop below the fold, however many
+     people join. -->
+<section class="screen screen-wait" id="screen-wait">
 
+  <div class="wait-head">
+    <div class="masthead-label" id="wait-kicker">Table Reserved</div>
     <div class="host-only">
-      <p class="wait-lead">Send this code, or the link below.</p>
       <div class="code-display" id="code-display">····</div>
-      <button class="btn btn-primary" id="btn-share">Send the Invitation</button>
-      <button class="btn" id="btn-copy">Copy Link</button>
-    </div>
-
-    <div class="seat-block">
-      <div class="field-label" id="seat-heading">At the table</div>
-      <ul class="seat-list" id="seat-list"></ul>
-    </div>
-
-    <div class="host-only">
-      <div class="stepper">
-        <span class="stepper-label">Computer players</span>
-        <div class="stepper-controls">
-          <button class="step-btn" id="bot-minus" aria-label="One fewer computer player">&minus;</button>
-          <span class="step-value" id="bot-count">0</span>
-          <button class="step-btn" id="bot-plus" aria-label="One more computer player">+</button>
-        </div>
+      <div class="share-row">
+        <button class="btn" id="btn-share">Send the Invitation</button>
+        <button class="btn" id="btn-copy">Copy Link</button>
       </div>
-      <button class="btn btn-primary" id="btn-start">Start the Game</button>
     </div>
+  </div>
 
+  <div class="wait-body">
+    <div class="field-label" id="seat-heading">At the table</div>
+    <ul class="seat-list" id="seat-list"></ul>
     <p class="wait-hint" id="wait-hint"></p>
     <p class="notice" id="wait-notice"></p>
+  </div>
 
+  <div class="wait-foot">
+    <div class="stepper host-only">
+      <span class="stepper-label">Computer players</span>
+      <div class="stepper-controls">
+        <button class="step-btn" id="bot-minus" aria-label="One fewer computer player">&minus;</button>
+        <span class="step-value" id="bot-count">0</span>
+        <button class="step-btn" id="bot-plus" aria-label="One more computer player">+</button>
+      </div>
+    </div>
+    <button class="btn btn-primary host-only" id="btn-start">Start the Game</button>
     <button class="linkish" id="btn-cancel">Never mind</button>
   </div>
 </section>
