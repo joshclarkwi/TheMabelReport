@@ -93,12 +93,6 @@
     return id;
   }
 
-  function listOf(names) {
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return names[0] + ' and ' + names[1];
-    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-  }
-
   function eachClient(fn) {
     Object.keys(App.clients).forEach(function (cid) {
       var c = App.clients[cid];
@@ -166,7 +160,7 @@
       score: [],
       scored: false,
       deals: 0,
-      lastTurn: -1,
+      lastSig: null,
       turnAt: 0,
       standIn: {}        // seats the house is currently playing for
     };
@@ -386,7 +380,7 @@
     t.state = G.newGame(t.seats.length, t.deals);
     t.deals++;
     t.scored = false;
-    t.lastTurn = -1;
+    t.lastSig = null;
     t.standIn = {};
     App.played = {};
     App.playedTotal = 0;
@@ -491,6 +485,14 @@
       return;
     }
 
+    if (msg.t === 'give' && App.tbl.started && c.seat != null) {
+      G.giveCard(App.tbl.state, c.seat, String(msg.card));
+      settle();
+      saveSession();
+      broadcast();
+      return;
+    }
+
     if (msg.t === 'rematch' && App.tbl.started && isOver()) deal();
   }
 
@@ -567,31 +569,48 @@
     var st = t.state;
     if (st.winner !== null || st.stuck) return;
 
-    if (t.lastTurn !== st.turn) { t.lastTurn = st.turn; t.turnAt = Date.now(); }
-    var seat = t.seats[st.turn];
+    // Whoever must act now: the player being asked for a card, or the player
+    // whose turn it is.
+    var acting = st.pending ? st.pending.giver : st.turn;
+    var sig = (st.pending ? 'g' : 't') + acting;
+    if (t.lastSig !== sig) { t.lastSig = sig; t.turnAt = Date.now(); }
+
+    var seat = t.seats[acting];
     if (!seat) return;
     var waited = Date.now() - t.turnAt;
 
+    var act = st.pending
+      ? function () { autoGive(acting); }
+      : function () { autoPlay(acting); };
+
     if (seat.kind === 'bot') {
-      if (waited >= BOT_DELAY) autoPlay(st.turn);
-    } else if (seat.clientId !== myClientId() && seatAway(st.turn)) {
+      if (waited >= BOT_DELAY) act();
+    } else if (seat.clientId !== myClientId() && seatAway(acting)) {
       // Someone's phone has gone quiet. Give them a decent grace period the
-      // first time, but once a seat is known to be away it plays at the same
+      // first time, but once a seat is known to be away it acts at the same
       // speed as a computer — otherwise one person walking off would cost the
       // whole table twenty seconds on every single one of their turns.
-      var grace = App.tbl.standIn[st.turn] ? BOT_DELAY : STANDIN_MS;
+      var grace = t.standIn[acting] ? BOT_DELAY : STANDIN_MS;
       if (waited >= grace) {
-        App.tbl.standIn[st.turn] = true;
-        autoPlay(st.turn);
+        t.standIn[acting] = true;
+        act();
       }
     }
   }
 
   function autoPlay(seat) {
-    var st = App.tbl.state;
-    var card = G.chooseCard(st, seat);
+    var card = G.chooseCard(App.tbl.state, seat);
     if (!card) return;
-    G.play(st, seat, card);
+    G.play(App.tbl.state, seat, card);
+    settle();
+    saveSession();
+    broadcast();
+  }
+
+  function autoGive(seat) {
+    var card = G.chooseGift(App.tbl.state, seat);
+    if (!card) return;
+    G.giveCard(App.tbl.state, seat, card);
     settle();
     saveSession();
     broadcast();
@@ -627,6 +646,17 @@
       broadcast();
     } else {
       trySend(App.conn, { t: 'play', card: card });
+    }
+  }
+
+  function requestGive(card) {
+    if (App.role === 'host') {
+      G.giveCard(App.tbl.state, 0, card);
+      settle();
+      saveSession();
+      broadcast();
+    } else {
+      trySend(App.conn, { t: 'give', card: card });
     }
   }
 
@@ -716,7 +746,7 @@
     showScreen('game');
     renderPlayers(p);
     renderTable(p.v);
-    renderHand(p.v);
+    renderHand(p);
     renderStatus(p);
     renderOutcome(p);
   }
@@ -730,10 +760,15 @@
     var strip = el('players');
     strip.innerHTML = '';
 
+    // While a card is owed it is the giver, not the player whose turn it is,
+    // who everybody is waiting on.
+    var acting = v.pending ? v.pending.giver : v.turn;
+
     for (var i = 0; i < v.n; i++) {
       var chip = document.createElement('div');
       var cls = 'chip';
-      if (i === v.turn && v.winner === null && !v.stuck) cls += ' is-turn';
+      if (i === acting && v.winner === null && !v.stuck) cls += ' is-turn';
+      if (v.pending && i === v.pending.requester) cls += ' is-asking';
       if (i === v.you) cls += ' is-you';
       if (p.kinds[i] === 'bot') cls += ' is-bot';
       if (p.away[i]) cls += ' is-away';
@@ -753,8 +788,8 @@
       strip.appendChild(chip);
     }
 
-    // keep whoever is on turn in view when eight chips will not fit at once
-    var turnChip = strip.children[v.turn];
+    // keep whoever must act in view when eight chips will not fit at once
+    var turnChip = strip.children[acting];
     if (turnChip && turnChip.scrollIntoView) {
       try { turnChip.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
     }
@@ -794,20 +829,30 @@
     });
   }
 
-  function renderHand(v) {
+  function renderHand(p) {
+    var v = p.v;
     var legal = {};
     v.legal.forEach(function (c) { legal[c] = true; });
 
+    // When you are the one being asked, any card in your hand will do — the
+    // choice of which is the whole point, so all of them become tappable.
+    var giving = v.youGive;
+
     el('hand').innerHTML = v.hand.map(function (card) {
-      var ok = !!legal[card];
-      return '<button class="card' + (G.isRed(card) ? ' red' : '') + (ok ? ' is-legal' : ' is-dead') +
-             '" data-card="' + card + '"' + (ok && v.yourTurn ? '' : ' disabled') + '>' +
+      var ok = giving || !!legal[card];
+      var cls = 'card' + (G.isRed(card) ? ' red' : '');
+      cls += giving ? ' is-gift' : (ok ? ' is-legal' : ' is-dead');
+      var live = giving || (ok && v.yourTurn);
+      return '<button class="' + cls + '" data-card="' + card + '"' + (live ? '' : ' disabled') + '>' +
              '<span class="rank">' + G.RANK_LABELS[G.rankOf(card)] + '</span>' +
              '<span class="pip">' + G.SUIT_GLYPHS[G.suitOf(card)] + '</span></button>';
     }).join('');
 
-    el('hand').classList.toggle('is-locked', !v.yourTurn);
-    el('hand-label-text').textContent = 'Your Hand · ' + v.hand.length;
+    el('hand').classList.toggle('is-locked', !giving && !v.yourTurn);
+    el('hand-area').classList.toggle('is-giving', giving);
+    el('hand-label-text').textContent = giving
+      ? 'Give a card to ' + nameOf(p, v.pending.requester)
+      : 'Your Hand · ' + v.hand.length;
   }
 
   function renderStatus(p) {
@@ -819,20 +864,33 @@
       text = 'The deal is over.';
     } else if (v.stuck) {
       text = 'The table is blocked.';
-    } else {
-      // Everything after the last card played is a run of forced passes.
-      var passed = [];
-      for (var i = v.log.length - 1; i >= 0 && v.log[i].type === 'pass'; i--) {
-        passed.unshift(nameOf(p, v.log[i].seat));
+    } else if (v.pending) {
+      if (v.youGive) {
+        text = nameOf(p, v.pending.requester) + ' has no card to play — choose one to give.';
+      } else if (v.youAsk) {
+        text = 'No legal card. You must ask ' + nameOf(p, v.pending.giver) + ' for one…';
+      } else {
+        text = nameOf(p, v.pending.requester) + ' is asking ' + nameOf(p, v.pending.giver) + ' for a card.';
       }
+    } else {
       var parts = [];
-      if (passed.length) parts.push(listOf(passed) + ' had no legal card.');
+      var tail = v.log.length ? v.log[v.log.length - 1] : null;
+      if (tail && tail.type === 'give') {
+        if (tail.to === v.you) {
+          parts.push(nameOf(p, tail.seat) + ' gave you the ' + G.label(tail.card) + '.');
+        } else if (tail.seat === v.you) {
+          parts.push('You gave ' + nameOf(p, tail.to) + ' the ' + G.label(tail.card) + '.');
+        } else {
+          parts.push(nameOf(p, tail.seat) + ' gave ' + nameOf(p, tail.to) + ' a card.');
+        }
+      }
       parts.push(v.yourTurn ? 'Your play.' : 'Waiting for ' + nameOf(p, v.turn) + '…');
       text = parts.join(' ');
     }
 
     bar.textContent = text;
-    bar.classList.toggle('is-you', v.yourTurn);
+    bar.classList.toggle('is-you', v.yourTurn || v.youGive);
+    bar.classList.toggle('is-asking', !!v.youGive);
   }
 
   function renderOutcome(p) {
@@ -956,9 +1014,15 @@
     var btn = e.target.closest('.card');
     if (!btn || btn.disabled) return;
     var v = App.payload && App.payload.v;
-    if (!v || !v.yourTurn) return;
+    if (!v) return;
     var card = btn.getAttribute('data-card');
-    if (v.legal.indexOf(card) === -1) return;
+
+    if (v.youGive) {                       // handing a card over, any card will do
+      btn.disabled = true;
+      requestGive(card);
+      return;
+    }
+    if (!v.yourTurn || v.legal.indexOf(card) === -1) return;
     btn.disabled = true;
     requestPlay(card);
   });
