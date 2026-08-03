@@ -446,20 +446,20 @@ input::placeholder { color: #BDB3A5; }
   border-bottom: 1px solid var(--ink);
 }
 
-/* Up to eight of these, so the row scrolls sideways rather than shrinking. */
+/* Up to eight of these. They wrap onto a second line rather than scrolling —
+   a strip that scrolls can push your own seat out of sight, which is exactly
+   when you start wondering whether the table has forgotten you. */
 .players {
   display: flex;
-  gap: 5px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
 }
-.players::-webkit-scrollbar { display: none; }
 
 .chip {
   flex: 0 0 auto;
-  min-width: 54px;
-  max-width: 92px;
+  min-width: 52px;
+  max-width: 88px;
   text-align: center;
   padding: 5px 7px 4px;
   background: var(--paper-edge);
@@ -602,6 +602,34 @@ input::placeholder { color: #BDB3A5; }
   0%   { transform: scale(1.16); box-shadow: 0 0 0 2px rgba(212,160,74,0.75); }
   100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(212,160,74,0); }
 }
+
+/* ===== GAME: THE RUNNING NOTE ===== */
+.ticker {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 66px;
+  padding: 4px 16px 8px;
+  text-align: center;
+}
+
+.tick {
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: italic;
+  color: #CFC6B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.3s ease;
+}
+.tick:nth-last-child(3) { color: #B9AE9F; }
+.tick:nth-last-child(2) { color: #9C907F; }
+.tick:nth-last-child(1) { color: var(--ink-soft); font-style: normal; }
+
+/* anything you were part of stands out from the traffic */
+.tick.is-mine { color: var(--ink); font-style: normal; }
+.tick.is-mine:nth-last-child(1) { font-weight: 600; }
 
 /* ===== GAME: YOUR HAND ===== */
 .hand-area {

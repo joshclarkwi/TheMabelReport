@@ -31,6 +31,8 @@
   var BEAT_EVERY = 6;       // ping every sixth tick
   var DEAD_MS = 11000;      // silence after which a link is presumed dead
   var BOT_DELAY = 900;      // let humans watch the computer think
+  var ASK_DELAY = 1700;     // a human being skipped needs to see why before it resolves
+  var AFTER_GIFT = 2100;    // and a beat afterwards to read what they were given
   var STANDIN_MS = 20000;   // how long a vanished player holds up the table
 
   function el(id) { return document.getElementById(id); }
@@ -583,14 +585,29 @@
       ? function () { autoGive(acting); }
       : function () { autoPlay(acting); };
 
+    /*
+     * A forfeited turn lays no card, so when it happens at computer speed the
+     * player it happened to never sees it and the table appears to have skipped
+     * them. Slow the two moments that matter: a human waiting to be handed a
+     * card, and the beat straight after any card changes hands.
+     */
+    var pace = BOT_DELAY;
+    if (st.pending) {
+      var askerSeat = t.seats[st.pending.requester];
+      if (askerSeat && askerSeat.kind !== 'bot') pace = ASK_DELAY;
+    } else {
+      var last = st.log.length ? st.log[st.log.length - 1] : null;
+      if (last && last.type === 'give') pace = AFTER_GIFT;
+    }
+
     if (seat.kind === 'bot') {
-      if (waited >= BOT_DELAY) act();
+      if (waited >= pace) act();
     } else if (seat.clientId !== myClientId() && seatAway(acting)) {
       // Someone's phone has gone quiet. Give them a decent grace period the
       // first time, but once a seat is known to be away it acts at the same
       // speed as a computer — otherwise one person walking off would cost the
       // whole table twenty seconds on every single one of their turns.
-      var grace = t.standIn[acting] ? BOT_DELAY : STANDIN_MS;
+      var grace = t.standIn[acting] ? pace : STANDIN_MS;
       if (waited >= grace) {
         t.standIn[acting] = true;
         act();
@@ -746,6 +763,7 @@
     showScreen('game');
     renderPlayers(p);
     renderTable(p.v);
+    renderTicker(p);
     renderHand(p);
     renderStatus(p);
     renderOutcome(p);
@@ -788,11 +806,46 @@
       strip.appendChild(chip);
     }
 
-    // keep whoever must act in view when eight chips will not fit at once
-    var turnChip = strip.children[acting];
-    if (turnChip && turnChip.scrollIntoView) {
-      try { turnChip.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+  }
+
+  /*
+   * The running note. It exists because a forfeit puts no card on the table:
+   * without it, three players in a row having nothing to play looks exactly
+   * like the table skipping your turn.
+   */
+  function tickerLine(p, e) {
+    var v = p.v;
+    var who = function (seat) { return nameOf(p, seat); };
+
+    if (e.type === 'play') {
+      return (e.seat === v.you ? 'You laid' : who(e.seat) + ' laid') + ' the ' + G.label(e.card);
     }
+    if (e.type === 'give') {
+      if (e.to === v.you) return 'You had no card — took the ' + G.label(e.card) + ' from ' + who(e.seat);
+      if (e.seat === v.you) return who(e.to) + ' had no card — you gave the ' + G.label(e.card);
+      return who(e.to) + ' had no card — took one from ' + who(e.seat);
+    }
+    if (e.type === 'win') return who(e.seat) + ' is out';
+    return null;
+  }
+
+  function renderTicker(p) {
+    var v = p.v;
+    var lines = [];
+    for (var i = v.log.length - 1; i >= 0 && lines.length < 4; i--) {
+      var e = v.log[i];
+      var text = tickerLine(p, e);
+      if (text) lines.unshift({ text: text, mine: e.seat === v.you || e.to === v.you });
+    }
+
+    var box = el('ticker');
+    box.innerHTML = '';
+    lines.forEach(function (l) {
+      var d = document.createElement('div');
+      d.className = 'tick' + (l.mine ? ' is-mine' : '');
+      d.textContent = l.text;
+      box.appendChild(d);
+    });
   }
 
   function renderTable(v) {

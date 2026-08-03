@@ -113,6 +113,10 @@
 
   <div class="table-area" id="table-area"><!-- suit strips injected here --></div>
 
+  <!-- A running note of the last few turns. A forfeited turn lays no card, so
+       without this the table appears to skip you. -->
+  <div class="ticker" id="ticker"></div>
+
   <div class="hand-area" id="hand-area">
     <div class="hand-label">
       <span id="hand-label-text">Your Hand</span>
@@ -178,6 +182,12 @@
     <p class="rules-note">Choosing what to give is its own small cruelty. Hand over the
       card you are least likely to be rid of and you are usually handing them the same
       problem.</p>
+
+    <p class="rules-note">Play goes round the table one seat at a time and nobody ever
+      lays two cards in a row. But a forfeited turn puts <b>no card on the table</b>, so
+      when several players in a row have nothing to play it can look as though your turn
+      never came. The strip along the top shows whose turn it is; the running note above
+      your hand records what has just happened, including every turn of your own.</p>
 
     <p class="rules-note">Computer players are marked <b>◇</b>. The host may seat up to
       seven of them, and may start the game whenever they please without waiting for a
